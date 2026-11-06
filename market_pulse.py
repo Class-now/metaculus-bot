@@ -6,9 +6,9 @@ from typing import Any, Iterable
 
 MARKET_PULSE_TOURNAMENT_ID = "market-pulse-26q4"
 
-# Runs are 4 hours apart, so a 36-hour window gets several chances to refresh.
-REFRESH_WINDOW = timedelta(hours=36)
-MIN_REFRESH_AGE = timedelta(hours=24)
+# Only the forecast standing at close is scored, so forecast late and once.
+# Runs are 4 hours apart, which leaves many retries inside the window.
+FORECAST_WINDOW = timedelta(hours=72)
 
 
 def _as_utc(value: datetime) -> datetime:
@@ -20,19 +20,13 @@ def _as_utc(value: datetime) -> datetime:
 def select_market_pulse_questions(
     questions: Iterable[Any], now: datetime | None = None
 ) -> list[Any]:
-    """Pick questions never forecast, or closing soon with a stale forecast."""
+    """Pick unforecast questions closing within the window, soonest first."""
     current = _as_utc(now or datetime.now(timezone.utc))
     selected = []
     for question in questions:
-        if not question.already_forecasted:
-            selected.append(question)
+        if question.already_forecasted or question.close_time is None:
             continue
-        close_time = question.close_time
-        last_forecast = question.timestamp_of_my_last_forecast
-        if close_time is None or last_forecast is None:
-            continue
-        closes_soon = _as_utc(close_time) - current <= REFRESH_WINDOW
-        is_stale = current - _as_utc(last_forecast) >= MIN_REFRESH_AGE
-        if closes_soon and is_stale:
+        time_left = _as_utc(question.close_time) - current
+        if timedelta(0) < time_left <= FORECAST_WINDOW:
             selected.append(question)
-    return selected
+    return sorted(selected, key=lambda q: _as_utc(q.close_time))

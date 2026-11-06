@@ -775,7 +775,7 @@ if __name__ == "__main__":
         )
     elif run_mode == "market_pulse":
         # Spot scoring: only the forecast standing at each question's close
-        # counts, so forecast new questions once and refresh near the close.
+        # counts, so forecast each question once, shortly before it closes.
         template_bot.skip_previously_forecasted_questions = False
         open_questions = client.get_all_open_questions_from_tournament(
             MARKET_PULSE_TOURNAMENT_ID
