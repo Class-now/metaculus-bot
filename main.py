@@ -722,6 +722,7 @@ if __name__ == "__main__":
             "default": GeneralLlm(
                 model="openrouter/anthropic/claude-sonnet-5.5",
                 temperature=0.3,
+                max_tokens=8000,  # OpenRouter holds credit for max_tokens per request
                 timeout=120,
                 allowed_tries=2,
             ),
@@ -729,6 +730,7 @@ if __name__ == "__main__":
             "researcher": GeneralLlm(
                 model="openrouter/anthropic/claude-sonnet-5.5:online",
                 temperature=0.1,
+                max_tokens=8000,  # OpenRouter holds credit for max_tokens per request
                 timeout=180,
                 allowed_tries=2,
             ),
