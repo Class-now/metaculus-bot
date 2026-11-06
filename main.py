@@ -7,6 +7,7 @@ from typing import Literal
 import dotenv
 
 # Runtime helpers (env validation, banners, dependency-warning suppression).
+from market_pulse import MARKET_PULSE_TOURNAMENT_ID, select_market_pulse_questions
 from bot_helpers import (
     check_environment,
     print_run_summary_banner,
@@ -693,12 +694,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--mode",
         type=str,
-        choices=["tournament", "metaculus_cup", "test_questions"],
+        choices=["tournament", "metaculus_cup", "market_pulse", "test_questions"],
         default="tournament",
         help="What to forecast on (default: tournament)",
     )
     args = parser.parse_args()
-    run_mode: Literal["tournament", "metaculus_cup", "test_questions"] = args.mode
+    run_mode: Literal[
+        "tournament", "metaculus_cup", "market_pulse", "test_questions"
+    ] = args.mode
 
     check_environment(strict=True)
     publish_to_metaculus = True
@@ -739,6 +742,7 @@ if __name__ == "__main__":
     TOURNAMENT_URLS = {
         "tournament": "https://www.metaculus.com/tournament/fall-futureeval-2026/",
         "metaculus_cup": "https://www.metaculus.com/tournament/metaculus-cup-fall-2026/",
+        "market_pulse": f"https://www.metaculus.com/tournament/{MARKET_PULSE_TOURNAMENT_ID}/",
         "test_questions": "https://www.metaculus.com/tournament/bot-testing-area/",
     }
 
@@ -767,6 +771,23 @@ if __name__ == "__main__":
         forecast_reports = asyncio.run(
             template_bot.forecast_on_tournament(
                 client.CURRENT_METACULUS_CUP_ID, return_exceptions=True
+            )
+        )
+    elif run_mode == "market_pulse":
+        # Spot scoring: only the forecast standing at each question's close
+        # counts, so forecast new questions once and refresh near the close.
+        template_bot.skip_previously_forecasted_questions = False
+        open_questions = client.get_all_open_questions_from_tournament(
+            MARKET_PULSE_TOURNAMENT_ID
+        )
+        selected_questions = select_market_pulse_questions(open_questions)
+        logger.info(
+            f"Market Pulse: {len(selected_questions)} of {len(open_questions)} "
+            "open questions selected"
+        )
+        forecast_reports = asyncio.run(
+            template_bot.forecast_questions(
+                selected_questions, return_exceptions=True
             )
         )
     elif run_mode == "test_questions":
