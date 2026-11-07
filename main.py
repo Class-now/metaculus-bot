@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -684,6 +685,38 @@ class FallTemplateBot2026(ForecastBot):
         )
 
 
+
+def build_llms() -> dict:
+    """LLM_BACKEND=claude_cli uses the owner's Claude subscription via `claude -p`."""
+    if os.getenv("LLM_BACKEND", "claude_cli") == "claude_cli":
+        from claude_cli_llm import ClaudeCliLlm
+
+        return {
+            "default": ClaudeCliLlm(cli_model="sonnet"),
+            "summarizer": ClaudeCliLlm(cli_model="haiku"),
+            "researcher": ClaudeCliLlm(cli_model="sonnet", web_search=True, timeout=900),
+            "parser": ClaudeCliLlm(cli_model="haiku"),
+        }
+    return {
+        "default": GeneralLlm(
+            model="openrouter/anthropic/claude-sonnet-5.5",
+            temperature=0.3,
+            max_tokens=8000,  # OpenRouter holds credit for max_tokens per request
+            timeout=120,
+            allowed_tries=2,
+        ),
+        "summarizer": "openrouter/anthropic/claude-haiku-5.5",
+        "researcher": GeneralLlm(
+            model="openrouter/anthropic/claude-sonnet-5.5:online",
+            temperature=0.1,
+            max_tokens=8000,  # OpenRouter holds credit for max_tokens per request
+            timeout=180,
+            allowed_tries=2,
+        ),
+        "parser": "openrouter/anthropic/claude-haiku-5.5",
+    }
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO,
@@ -718,24 +751,7 @@ if __name__ == "__main__":
         folder_to_save_reports_to=None,
         skip_previously_forecasted_questions=True,
         extra_metadata_in_explanation=True,
-        llms={
-            "default": GeneralLlm(
-                model="openrouter/anthropic/claude-sonnet-5.5",
-                temperature=0.3,
-                max_tokens=8000,  # OpenRouter holds credit for max_tokens per request
-                timeout=120,
-                allowed_tries=2,
-            ),
-            "summarizer": "openrouter/anthropic/claude-haiku-5.5",
-            "researcher": GeneralLlm(
-                model="openrouter/anthropic/claude-sonnet-5.5:online",
-                temperature=0.1,
-                max_tokens=8000,  # OpenRouter holds credit for max_tokens per request
-                timeout=180,
-                allowed_tries=2,
-            ),
-            "parser": "openrouter/anthropic/claude-haiku-5.5",
-        },
+        llms=build_llms(),
     )
 
     # Per-mode tournament URL shown in the summary banner footer. These

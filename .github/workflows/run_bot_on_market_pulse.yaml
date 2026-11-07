@@ -37,27 +37,25 @@ jobs:
       #     key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
       - name: Install dependencies
         run: poetry install --no-interaction --no-root
-      # A low balance makes research calls succeed and forecast calls fail, which
-      # spends the credit without posting anything. Fail here before any LLM call.
-      - name: Check OpenRouter credit
-        run: |
-          curl -sf -H "Authorization: Bearer $OPENROUTER_API_KEY" https://openrouter.ai/api/v1/credits | python -c "
-          import json, sys
-          d = json.load(sys.stdin)['data']
-          left = d['total_credits'] - d['total_usage']
-          print(f'OpenRouter credit left: {left:.2f} USD')
-          if left < 1.5:
-              print('::error::OpenRouter credit is below 1.50 USD; skipping forecasts')
-              sys.exit(1)
-          "
+      # LLM calls go through Claude Code with the owner's Claude subscription
+      # (CLAUDE_CODE_OAUTH_TOKEN from `claude setup-token`), not OpenRouter.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code && claude --version
+      - name: Check Claude Code login
+        run: echo "Reply with OK" | claude -p --tools "" --model haiku
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       - name: Run bot
         run: |
           poetry run python main.py --mode market_pulse
         # this reads the environment variables from the github repository.
         # Store under Settings --> Secrets and variables --> Actions
         env:
+          LLM_BACKEND: claude_cli
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           METACULUS_TOKEN: ${{ secrets.METACULUS_TOKEN }} # replace this with the name of the variable under which you stored your own Metaculus token
           PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
           EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
